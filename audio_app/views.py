@@ -36,8 +36,6 @@ class AudioUploadView(APIView):
             processed_path = detect_and_reduce_silences(full_audio_path)
         elif processing_choice == 'clicks':
             processed_path = remove_clicks(full_audio_path)
-        elif processing_choice == 'noise':
-            processed_path = reduce_noise(full_audio_path)
         else:
             return Response({"error": "Choix de traitement invalide."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -45,24 +43,17 @@ class AudioUploadView(APIView):
         return Response({"message": "Fichier traité avec succès.", "file_url": processed_file_url}, status=status.HTTP_200_OK)
 
     def get(self, request, *args, **kwargs):
-        """
-        Méthode GET pour renvoyer un fichier traité.
-        Le fichier doit être spécifié par le paramètre GET `file` (e.g., ?file=processed_audio.mp3).
-        """
-        # Récupérer le nom du fichier traité à partir du paramètre GET
+
         file_name = request.GET.get('file')
         if not file_name:
             return Response({"error": "Veuillez spécifier le nom du fichier en tant que paramètre GET (file)."},
                             status=status.HTTP_400_BAD_REQUEST)
 
-        # Construire le chemin vers le fichier traité
         file_path = os.path.join(settings.MEDIA_ROOT, 'uploads', file_name)
 
-        # Vérifier si le fichier existe
         if not os.path.exists(file_path):
             return Response({"error": "Le fichier demandé n'existe pas."}, status=status.HTTP_404_NOT_FOUND)
 
-        # Ouvrir le fichier et le renvoyer dans la réponse
         try:
             file = open(file_path, 'rb')
             response = FileResponse(file, content_type="audio/mpeg")
@@ -70,6 +61,7 @@ class AudioUploadView(APIView):
             return response
         except Exception as e:
             return Response({"error": f"Erreur lors de l'envoi du fichier : {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 
 def detect_and_replace_silences(file_path, threshold=0.01, frame_duration=0.02):
@@ -107,6 +99,8 @@ def detect_and_replace_silences(file_path, threshold=0.01, frame_duration=0.02):
     modified_signal = (modified_signal * 32767).astype(np.int16)
     
     write(file_path, fs, modified_signal)  
+    return file_path
+    
 
 
 def detect_and_reduce_silences(file_path, threshold=0.01, frame_duration=0.02, attenuation_factor=0.1):
@@ -140,6 +134,8 @@ def detect_and_reduce_silences(file_path, threshold=0.01, frame_duration=0.02, a
     modified_signal = (modified_signal * 32767).astype(np.int16)
     
     write(file_path, fs, modified_signal) 
+    return file_path
+    
 
 
 def reduce_noise(input_file: str, noise_start: float = 0, noise_end: float = 1):
@@ -158,15 +154,22 @@ def reduce_noise(input_file: str, noise_start: float = 0, noise_end: float = 1):
     audio_denoised = librosa.istft(audio_denoised_stft)
     
     sf.write(input_file, audio_denoised, sr)
+    return input_file
+    
+    
 
+def remove_clicks(file_path, threshold_factor=10000, window_size=50):
 
-def remove_clicks(audio, sr, threshold_factor=10000, window_size=50):
-
+    audio, sr = librosa.load(file_path, sr=None)
+    
+    # Calculer le RMS pour déterminer le seuil
     rms_value = np.sqrt(np.mean(audio**2))
-    threshold = rms_value / threshold_factor  # Ajuste ce seuil selon ton signal
+    threshold = rms_value / threshold_factor
+    
+    # Détection des indices des clics
     click_indices = np.where(np.abs(audio) > threshold)[0]
-
-    # Supprimer les clics
+    
+    # Réparer les clics
     repaired_audio = np.copy(audio)
     for idx in click_indices:
         # Définir une fenêtre autour du clic
@@ -177,5 +180,5 @@ def remove_clicks(audio, sr, threshold_factor=10000, window_size=50):
         if start > 0 and end < len(audio):
             repaired_audio[idx] = np.mean(np.concatenate((audio[start:idx], audio[idx+1:end])))
     
-    return repaired_audio
-
+    sf.write(file_path, repaired_audio, sr)
+    return file_path
