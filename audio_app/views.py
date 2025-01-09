@@ -11,6 +11,10 @@ from scipy.io.wavfile import read, write
 import matplotlib.pyplot as plt
 import librosa
 import soundfile as sf
+from scipy.signal import butter, lfilter
+from pydub import AudioSegment
+from pydub.silence import detect_nonsilent
+
 
 class AudioUploadView(APIView):
     parser_classes = [MultiPartParser, FormParser]
@@ -63,7 +67,6 @@ class AudioUploadView(APIView):
             return Response({"error": f"Erreur lors de l'envoi du fichier : {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-
 def detect_and_replace_silences(file_path, threshold=0.01, frame_duration=0.02):
 
     fs, signal = read(file_path)
@@ -102,7 +105,6 @@ def detect_and_replace_silences(file_path, threshold=0.01, frame_duration=0.02):
     return file_path
     
 
-
 def detect_and_reduce_silences(file_path, threshold=0.01, frame_duration=0.02, attenuation_factor=0.1):
     fs, signal = read(file_path)
     
@@ -136,7 +138,6 @@ def detect_and_reduce_silences(file_path, threshold=0.01, frame_duration=0.02, a
     write(file_path, fs, modified_signal) 
     return file_path
     
-
 
 def reduce_noise(input_file: str, noise_start: float = 0, noise_end: float = 1):
     audio, sr = librosa.load(input_file, sr=None)
@@ -182,3 +183,58 @@ def remove_clicks(file_path, threshold_factor=10000, window_size=50):
     
     sf.write(file_path, repaired_audio, sr)
     return file_path
+
+from pydub import AudioSegment
+from pydub.silence import detect_nonsilent
+
+# def supprimer_silences(audio_path, seuil_silence=-40, min_duree_silence=1000, output_path="audio_sans_silence.wav"):
+
+#     try:
+#         # Charger le fichier audio
+#         audio = AudioSegment.from_file(audio_path)
+#     except Exception as e:
+#         raise ValueError(f"Erreur lors du chargement du fichier audio : {e}")
+
+#     # Détecter les segments non silencieux
+#     non_silent_segments = detect_nonsilent(audio, min_silence_len=min_duree_silence, silence_thresh=seuil_silence)
+
+#     if not non_silent_segments:
+#         raise ValueError("Aucun segment non silencieux détecté.")
+
+#     # Créer un nouvel audio en concaténant les segments non silencieux
+#     audio_sans_silence = AudioSegment.empty()
+#     for start, end in non_silent_segments:
+#         audio_sans_silence += audio[start:end]
+
+#     # Exporter l'audio résultant
+#     try:
+#         audio_sans_silence.export(output_path, format="wav")
+#     except Exception as e:
+#         raise ValueError(f"Erreur lors de l'exportation du fichier audio : {e}")
+
+#     return output_path
+
+
+
+# def bandpass_filter(data, sr, lowcut, highcut, order=5):
+
+#     nyquist = 0.5 * sr  # Fréquence de Nyquist
+#     low = lowcut / nyquist
+#     high = highcut / nyquist
+
+#     # Conception du filtre Butterworth passe-bande
+#     b, a = butter(order, [low, high], btype='band')
+#     filtered_data = lfilter(b, a, data)
+#     return filtered_data
+
+# def process_audio(input_file, output_file, lowcut=300, highcut=3400, order=5):
+
+#     audio, sr = librosa.load(input_file, sr=None)
+    
+#     # Appliquer le filtre passe-bande
+#     filtered_audio = bandpass_filter(audio, sr, lowcut, highcut, order)
+
+#     # Sauvegarder l'audio filtré
+#     sf.write(output_file, filtered_audio, sr)
+#     return output_file
+
