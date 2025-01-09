@@ -72,7 +72,8 @@ def detect_and_reduce_silences(file_path, threshold=0.01, frame_duration=0.02, a
     
     modified_signal = (modified_signal * 32767).astype(np.int16)
     
-    write(file_path, fs, modified_signal)  
+    write(file_path, fs, modified_signal) 
+
 
 def reduce_noise(input_file: str, noise_start: float = 0, noise_end: float = 1):
     audio, sr = librosa.load(input_file, sr=None)
@@ -90,3 +91,24 @@ def reduce_noise(input_file: str, noise_start: float = 0, noise_end: float = 1):
     audio_denoised = librosa.istft(audio_denoised_stft)
     
     sf.write(input_file, audio_denoised, sr)
+
+
+def remove_clicks(audio, sr, threshold_factor=10000, window_size=50):
+
+    rms_value = np.sqrt(np.mean(audio**2))
+    threshold = rms_value / threshold_factor  # Ajuste ce seuil selon ton signal
+    click_indices = np.where(np.abs(audio) > threshold)[0]
+
+    # Supprimer les clics
+    repaired_audio = np.copy(audio)
+    for idx in click_indices:
+        # Définir une fenêtre autour du clic
+        start = max(0, idx - window_size)
+        end = min(len(audio), idx + window_size)
+        
+        # Interpoler les valeurs
+        if start > 0 and end < len(audio):
+            repaired_audio[idx] = np.mean(np.concatenate((audio[start:idx], audio[idx+1:end])))
+    
+    return repaired_audio
+
